@@ -28,6 +28,7 @@ import json
 import argparse
 from six.moves import cPickle
 from collections import defaultdict
+import jieba
 
 def precook(s, n=4, out=False):
   """
@@ -92,7 +93,10 @@ def build_dict(imgs, wtoi, params):
       #(params['split'] == 'val' and img['split'] == 'restval') or \
       ref_words = []
       ref_idxs = []
-      for sent in img['sentences']:
+      for sent in img['caption']:
+        sent = sent.strip().split()
+        sent = ''.join(sent)
+        sent['tokens'] = list(jieba.cut(sent, cut_all=False))
         tmp_tokens = sent['tokens'] + ['<eos>']
         tmp_tokens = [_ if _ in wtoi else 'UNK' for _ in tmp_tokens]
         ref_words.append(' '.join(tmp_tokens))
@@ -109,10 +113,9 @@ def build_dict(imgs, wtoi, params):
 def main(params):
 
   imgs = json.load(open(params['input_json'], 'r'))
-  itow = json.load(open(params['dict_json'], 'r'))['ix_to_word']
+  tmp = json.load(open(params['dict_json'], 'r'))
+  itow = tmp['ix_to_word']
   wtoi = {w:i for i,w in itow.items()}
-
-  imgs = imgs['images']
 
   ngram_words, ngram_idxs, ref_len = build_dict(imgs, wtoi, params)
 

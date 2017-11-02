@@ -1,3 +1,4 @@
+# coding: utf-8
 """
 Preprocess a raw json dataset into hdf5/json files for use in data_loader.lua
 
@@ -13,13 +14,13 @@ Output: a json file and an hdf5 file
 The hdf5 file contains several fields:
 /images is (N,3,256,256) uint8 array of raw image data in RGB format
 /labels is (M,max_length) uint32 array of encoded labels, zero padded
-/label_start_ix and /label_end_ix are (N,) uint32 arrays of pointers to the 
+/label_start_ix and /label_end_ix are (N,) uint32 arrays of pointers to the
   first and last indices (in range 1..M) of labels for each image
 /label_length stores the length of the sequence for each of the M sequences
 
 The json file has a dict that contains:
 - an 'ix_to_word' field storing the vocab in form {ix:'word'}, where ix is 1-indexed
-- an 'images' field that is a list holding auxiliary information for each image, 
+- an 'images' field that is a list holding auxiliary information for each image,
   such as in particular the 'split' it was assigned to.
 """
 
@@ -28,6 +29,9 @@ import json
 import argparse
 from six.moves import cPickle
 from collections import defaultdict
+import sys
+reload(sys)
+sys.setdefaultencoding('utf8')
 import jieba
 
 def precook(s, n=4, out=False):
@@ -87,23 +91,21 @@ def build_dict(imgs, wtoi, params):
   refs_words = []
   refs_idxs = []
   for img in imgs:
-    if (params['split'] == img['split']) or \
-      (params['split'] == 'train' and img['split'] == 'restval') or \
-      (params['split'] == 'all'):
-      #(params['split'] == 'val' and img['split'] == 'restval') or \
-      ref_words = []
-      ref_idxs = []
-      for sent in img['caption']:
-        sent = sent.strip().split()
-        sent = ''.join(sent)
-        sent['tokens'] = list(jieba.cut(sent, cut_all=False))
-        tmp_tokens = sent['tokens'] + ['<eos>']
-        tmp_tokens = [_ if _ in wtoi else 'UNK' for _ in tmp_tokens]
-        ref_words.append(' '.join(tmp_tokens))
-        ref_idxs.append(' '.join([str(wtoi[_]) for _ in tmp_tokens]))
-      refs_words.append(ref_words)
-      refs_idxs.append(ref_idxs)
-      count_imgs += 1
+    ref_words = []
+    ref_idxs = []
+    for sent in img['caption']:
+      sent = sent.strip().split()
+      sent = ''.join(sent)
+      if sent == '' :
+        continue
+      token_list = list(jieba.cut(sent, cut_all=False))
+      tmp_tokens = token_list + ['<eos>']
+      tmp_tokens = [_ if _ in wtoi else 'UNK' for _ in tmp_tokens]
+      ref_words.append(' '.join(tmp_tokens))
+      ref_idxs.append(' '.join([str(wtoi[_]) for _ in tmp_tokens]))
+    refs_words.append(ref_words)
+    refs_idxs.append(ref_idxs)
+    count_imgs += 1
   print('total imgs:', count_imgs)
 
   ngram_words = compute_doc_freq(create_crefs(refs_words))
@@ -112,7 +114,9 @@ def build_dict(imgs, wtoi, params):
 
 def main(params):
 
-  imgs = json.load(open(params['input_json'], 'r'))
+  imgs1 = json.load(open(params['input_json1'], 'r'))
+  imgs2 = json.load(open(params['input_json2'], 'r'))
+  imgs = imgs1 + imgs2
   tmp = json.load(open(params['dict_json'], 'r'))
   itow = tmp['ix_to_word']
   wtoi = {w:i for i,w in itow.items()}
@@ -127,7 +131,8 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
 
   # input json
-  parser.add_argument('--input_json', default='/home-nfs/rluo/rluo/nips/code/prepro/dataset_coco.json', help='input json file to process into hdf5')
+  parser.add_argument('--input_json1', default='/home-nfs/rluo/rluo/nips/code/prepro/dataset_coco.json', help='input json file to process into hdf5')
+  parser.add_argument('--input_json2', default='/home-nfs/rluo/rluo/nips/code/prepro/dataset_coco.json', help='input json file to process into hdf5')
   parser.add_argument('--dict_json', default='data/cocotalk.json', help='output json file')
   parser.add_argument('--output_pkl', default='data/coco-all', help='output pickle file')
   parser.add_argument('--split', default='all', help='test, val, train, all')

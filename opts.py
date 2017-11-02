@@ -11,6 +11,15 @@ def parse_opt():
                     help='path to the directory containing the preprocessed att feats')
     parser.add_argument('--input_label_h5', type=str, default='data/coco_label.h5',
                     help='path to the h5file containing the preprocessed dataset')
+    parser.add_argument('--use_img', type=int, default=0)
+    parser.add_argument('--img_fold', type=str)
+    parser.add_argument('--img_size', type=int, default=512)
+    parser.add_argument('--img_csize', type=int, default=448)
+    parser.add_argument('--use_topic', type=int, default=0)
+    parser.add_argument('--input_topic_h5', type=str)
+    parser.add_argument('--topic_num', type=int, default=500)
+    parser.add_argument('--use_fc', type=int, default=1)
+
     parser.add_argument('--start_from', type=str, default=None,
                     help="""continue training from saved model at this path. Path must contain files saved by previous training process: 
                         'infos.pkl'         : configuration;
@@ -18,6 +27,7 @@ def parse_opt():
                                               Note: this file contains absolute paths, be careful when moving files around;
                         'model.ckpt-*'      : file(s) with model definition (created by tf)
                     """)
+    parser.add_argument('--old_id', type=int)
     parser.add_argument('--cached_tokens', type=str, default='coco-train-idxs',
                     help='Cached token file for calculating cider score during self critical training.')
 
@@ -44,6 +54,8 @@ def parse_opt():
                     help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=16,
                     help='minibatch size')
+    parser.add_argument('--gpu_num', type=int, default=1)
+    parser.add_argument('--fix_rnn', type=int, default=0)
     parser.add_argument('--grad_clip', type=float, default=0.1, #5.,
                     help='clip gradients at this value')
     parser.add_argument('--drop_prob_lm', type=float, default=0.5,

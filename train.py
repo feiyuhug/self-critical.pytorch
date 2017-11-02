@@ -15,7 +15,7 @@ from six.moves import cPickle
 
 import opts
 import models
-from dataloader import *
+from dataloader_feat import *
 import eval_utils
 import misc.utils as utils
 from misc.rewards import init_cider_scorer, get_self_critical_reward
@@ -69,6 +69,10 @@ def train(opt):
     model = models.setup(opt)
     model.cuda()
 
+    if opt.gpu_num > 1 :
+        model_ = torch.nn.DataParallel(model, device_ids=range(opt.gpu_num))
+    else :
+        model_ = model
     update_lr_flag = True
     # Assure in training mode
     model.train()
@@ -83,85 +87,8 @@ def train(opt):
         optimizer.load_state_dict(torch.load(os.path.join(opt.start_from, 'optimizer.pth')))
 
     while True:
-        if update_lr_flag:
-                # Assign the learning rate
-            if epoch > opt.learning_rate_decay_start and opt.learning_rate_decay_start >= 0:
-                frac = (epoch - opt.learning_rate_decay_start) // opt.learning_rate_decay_every
-                decay_factor = opt.learning_rate_decay_rate  ** frac
-                opt.current_lr = opt.learning_rate * decay_factor
-                utils.set_lr(optimizer, opt.current_lr) # set the decayed rate
-            else:
-                opt.current_lr = opt.learning_rate
-            # Assign the scheduled sampling prob
-            if epoch > opt.scheduled_sampling_start and opt.scheduled_sampling_start >= 0:
-                frac = (epoch - opt.scheduled_sampling_start) // opt.scheduled_sampling_increase_every
-                opt.ss_prob = min(opt.scheduled_sampling_increase_prob  * frac, opt.scheduled_sampling_max_prob)
-                model.ss_prob = opt.ss_prob
-
-            # If start self critical training
-            if opt.self_critical_after != -1 and epoch >= opt.self_critical_after:
-                sc_flag = True
-                init_cider_scorer(opt.cached_tokens)
-            else:
-                sc_flag = False
-
-            update_lr_flag = False
-                
-        start = time.time()
-        # Load data from train split (0)
-        data = loader.get_batch('train')
-        print('Read data:', time.time() - start)
-
-        torch.cuda.synchronize()
-        start = time.time()
-
-        tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks']]
-        tmp = [Variable(torch.from_numpy(_), requires_grad=False).cuda() for _ in tmp]
-        fc_feats, att_feats, labels, masks = tmp
-        
-        optimizer.zero_grad()
-        if not sc_flag:
-            loss = crit(model(fc_feats, att_feats, labels), labels[:,1:], masks[:,1:])
-        else:
-            gen_result, sample_logprobs = model.sample(fc_feats, att_feats, {'sample_max':0})
-            reward = get_self_critical_reward(model, fc_feats, att_feats, data, gen_result)
-            loss = rl_crit(sample_logprobs, gen_result, Variable(torch.from_numpy(reward).float().cuda(), requires_grad=False))
-
-        loss.backward()
-        utils.clip_gradient(optimizer, opt.grad_clip)
-        optimizer.step()
-        train_loss = loss.data[0]
-        torch.cuda.synchronize()
-        end = time.time()
-        if not sc_flag:
-            print("iter {} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}" \
-                .format(iteration, epoch, train_loss, end - start))
-        else:
-            print("iter {} (epoch {}), avg_reward = {:.3f}, time/batch = {:.3f}" \
-                .format(iteration, epoch, np.mean(reward[:,0]), end - start))
-
-        # Update the iteration and epoch
-        iteration += 1
-        if data['bounds']['wrapped']:
-            epoch += 1
-            update_lr_flag = True
-
-        # Write the training loss summary
-        if (iteration % opt.losses_log_every == 0):
-            if tf is not None:
-                add_summary_value(tf_summary_writer, 'train_loss', train_loss, iteration)
-                add_summary_value(tf_summary_writer, 'learning_rate', opt.current_lr, iteration)
-                add_summary_value(tf_summary_writer, 'scheduled_sampling_prob', model.ss_prob, iteration)
-                if sc_flag:
-                    add_summary_value(tf_summary_writer, 'avg_reward', np.mean(reward[:,0]), iteration)
-                tf_summary_writer.flush()
-
-            loss_history[iteration] = train_loss if not sc_flag else np.mean(reward[:,0])
-            lr_history[iteration] = opt.current_lr
-            ss_prob_history[iteration] = model.ss_prob
-
         # make evaluation on validation set, and save model
-        if (iteration % opt.save_checkpoint_every == 0):
+        if (update_lr_flag):
             # eval model
             eval_kwargs = {'split': 'val',
                             'dataset': opt.input_json}
@@ -217,6 +144,83 @@ def train(opt):
                     print("model saved to {}".format(checkpoint_path))
                     with open(os.path.join(opt.checkpoint_path, 'infos_'+opt.id+'-best.pkl'), 'wb') as f:
                         cPickle.dump(infos, f)
+
+        if update_lr_flag:
+                # Assign the learning rate
+            if epoch > opt.learning_rate_decay_start and opt.learning_rate_decay_start >= 0:
+                frac = (epoch - opt.learning_rate_decay_start) // opt.learning_rate_decay_every
+                decay_factor = opt.learning_rate_decay_rate  ** frac
+                opt.current_lr = opt.learning_rate * decay_factor
+                utils.set_lr(optimizer, opt.current_lr) # set the decayed rate
+            else:
+                opt.current_lr = opt.learning_rate
+            # Assign the scheduled sampling prob
+            if epoch > opt.scheduled_sampling_start and opt.scheduled_sampling_start >= 0:
+                frac = (epoch - opt.scheduled_sampling_start) // opt.scheduled_sampling_increase_every
+                opt.ss_prob = min(opt.scheduled_sampling_increase_prob  * frac, opt.scheduled_sampling_max_prob)
+                model.ss_prob = opt.ss_prob
+
+            # If start self critical training
+            if opt.self_critical_after != -1 and epoch >= opt.self_critical_after:
+                sc_flag = True
+                init_cider_scorer(opt.cached_tokens)
+            else:
+                sc_flag = False
+
+            update_lr_flag = False
+
+        start = time.time()
+        # Load data from train split (0)
+        data = loader.get_batch('train')
+        print('Read data:', time.time() - start)
+
+        torch.cuda.synchronize()
+        start = time.time()
+
+        tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks']]
+        tmp = [Variable(torch.from_numpy(_), requires_grad=False).cuda() for _ in tmp]
+        fc_feats, att_feats, labels, masks = tmp
+        
+        optimizer.zero_grad()
+        if not sc_flag:
+            loss = crit(model_(fc_feats, att_feats, labels), labels[:,1:], masks[:,1:])
+        else:
+            gen_result, sample_logprobs = model.sample(fc_feats, att_feats, {'sample_max':0})
+            reward = get_self_critical_reward(model, fc_feats, att_feats, data, gen_result)
+            loss = rl_crit(sample_logprobs, gen_result, Variable(torch.from_numpy(reward).float().cuda(), requires_grad=False))
+
+        loss.backward()
+        utils.clip_gradient(optimizer, opt.grad_clip)
+        optimizer.step()
+        train_loss = loss.data[0]
+        torch.cuda.synchronize()
+        end = time.time()
+        if not sc_flag:
+            print("iter {} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}" \
+                .format(iteration, epoch, train_loss, end - start))
+        else:
+            print("iter {} (epoch {}), avg_reward = {:.3f}, time/batch = {:.3f}" \
+                .format(iteration, epoch, np.mean(reward[:,0]), end - start))
+
+        # Update the iteration and epoch
+        iteration += 1
+        if data['bounds']['wrapped']:
+            epoch += 1
+            update_lr_flag = True
+
+        # Write the training loss summary
+        if (iteration % opt.losses_log_every == 0):
+            if tf is not None:
+                add_summary_value(tf_summary_writer, 'train_loss', train_loss, iteration)
+                add_summary_value(tf_summary_writer, 'learning_rate', opt.current_lr, iteration)
+                add_summary_value(tf_summary_writer, 'scheduled_sampling_prob', model.ss_prob, iteration)
+                if sc_flag:
+                    add_summary_value(tf_summary_writer, 'avg_reward', np.mean(reward[:,0]), iteration)
+                tf_summary_writer.flush()
+
+            loss_history[iteration] = train_loss if not sc_flag else np.mean(reward[:,0])
+            lr_history[iteration] = opt.current_lr
+            ss_prob_history[iteration] = model.ss_prob
 
         # Stop if reaching max epochs
         if epoch >= opt.max_epochs and opt.max_epochs != -1:

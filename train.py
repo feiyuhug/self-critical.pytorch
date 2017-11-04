@@ -12,11 +12,14 @@ import numpy as np
 import time
 import os
 from six.moves import cPickle
+import sys
+reload(sys)
+sys.setdefaultencoding('UTF8')
 
 import opts
 import models
 from dataloader_feat import *
-import eval_utils
+import eval_utils_t
 import misc.utils as utils
 from misc.rewards import init_cider_scorer, get_self_critical_reward
 
@@ -42,15 +45,15 @@ def train(opt):
     histories = {}
     if opt.start_from is not None:
         # open old infos and check if models are compatible
-        with open(os.path.join(opt.start_from, 'infos_'+opt.id+'.pkl')) as f:
+        with open(os.path.join(opt.start_from, 'infos_'+opt.old_id+'.pkl')) as f:
             infos = cPickle.load(f)
             saved_model_opt = infos['opt']
-            need_be_same=["caption_model", "rnn_type", "rnn_size", "num_layers"]
+            need_be_same=["rnn_type", "rnn_size", "num_layers"]
             for checkme in need_be_same:
                 assert vars(saved_model_opt)[checkme] == vars(opt)[checkme], "Command line argument and saved model disagree on '%s' " % checkme
 
-        if os.path.isfile(os.path.join(opt.start_from, 'histories_'+opt.id+'.pkl')):
-            with open(os.path.join(opt.start_from, 'histories_'+opt.id+'.pkl')) as f:
+        if os.path.isfile(os.path.join(opt.start_from, 'histories_'+opt.old_id+'.pkl')):
+            with open(os.path.join(opt.start_from, 'histories_'+opt.old_id+'.pkl')) as f:
                 histories = cPickle.load(f)
 
     iteration = infos.get('iter', 0)
@@ -93,7 +96,7 @@ def train(opt):
             eval_kwargs = {'split': 'val',
                             'dataset': opt.input_json}
             eval_kwargs.update(vars(opt))
-            val_loss, predictions, lang_stats = eval_utils.eval_split(model, crit, loader, eval_kwargs)
+            val_loss, predictions, lang_stats = eval_utils_t.eval_split(None, model, crit, loader, eval_kwargs)
 
             # Write validation result into summary
             if tf is not None:
@@ -180,7 +183,7 @@ def train(opt):
         tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks']]
         tmp = [Variable(torch.from_numpy(_), requires_grad=False).cuda() for _ in tmp]
         fc_feats, att_feats, labels, masks = tmp
-        
+
         optimizer.zero_grad()
         if not sc_flag:
             loss = crit(model_(fc_feats, att_feats, labels), labels[:,1:], masks[:,1:])

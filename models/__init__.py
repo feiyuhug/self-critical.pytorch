@@ -16,7 +16,7 @@ from .Att2inModel import Att2inModel
 from .AttModel import *
 
 def setup(opt):
-    
+
     if opt.caption_model == 'fc':
         model = FCModel(opt)
     # Att2in model in self-critical
@@ -39,9 +39,9 @@ def setup(opt):
 
     # check compatibility if training is continued from previously saved model
     if vars(opt).get('start_from', None) is not None:
-        # check if all necessary files exist 
+        # check if all necessary files exist
         assert os.path.isdir(opt.start_from)," %s must be a a path" % opt.start_from
-        assert os.path.isfile(os.path.join(opt.start_from,"infos_"+opt.id+".pkl")),"infos.pkl file does not exist in path %s"%opt.start_from
+        assert os.path.isfile(os.path.join(opt.start_from,"infos_"+opt.old_id+".pkl")),"infos.pkl file does not exist in path %s"%opt.start_from
         model.load_state_dict(torch.load(os.path.join(opt.start_from, 'model.pth')))
 
     return model

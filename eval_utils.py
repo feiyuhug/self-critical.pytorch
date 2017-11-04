@@ -90,20 +90,19 @@ def eval_split(model, crit, loader, eval_kwargs={}):
 
         # forward the model to also get generated samples for each image
         # Only leave one feature for each image, in case duplicate sample
-        tmp = [data['fc_feats'][np.arange(loader.batch_size) * loader.seq_per_img], 
+        tmp = [data['fc_feats'][np.arange(loader.batch_size) * loader.seq_per_img],
             data['att_feats'][np.arange(loader.batch_size) * loader.seq_per_img]]
         tmp = [Variable(torch.from_numpy(_), volatile=True).cuda() for _ in tmp]
         fc_feats, att_feats = tmp
         # forward the model to also get generated samples for each image
         seq, _ = model.sample(fc_feats, att_feats, eval_kwargs)
-        
+
         #set_trace()
         sents = utils.decode_sequence(loader.get_vocab(), seq)
 
         for k, sent in enumerate(sents):
-            entry = {'image_id': data['infos'][k]['id'], 'caption': sent}
-            if eval_kwargs.get('dump_path', 0) == 1:
-                entry['file_name'] = data['infos'][k]['file_path']
+            sent = ''.join(sent.strip().split())
+            entry = {'image_id': data['infos'][k]['image_id'], 'caption': sent}
             predictions.append(entry)
             if eval_kwargs.get('dump_images', 0) == 1:
                 # dump the raw image to vis/ folder

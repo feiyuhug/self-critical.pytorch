@@ -282,7 +282,8 @@ class BlobFetcher():
     def _get_next_minibatch_inds(self):
         if not hasattr(self, 'split_loader'):
             self.reset()
-        max_index = len(self.dataloader.split_ix[self.split])
+        max_index = len(self.dataloader.split_ix[self.split]) \
+            - (len(self.dataloader.split_ix[self.split]) % self.dataloader.batch_size)
         wrapped = False
 
         ri = self.dataloader.iterators[self.split]

@@ -175,7 +175,7 @@ def train(opt):
         start = time.time()
         # Load data from train split (0)
         data = loader.get_batch('train')
-        print('Read data:', time.time() - start)
+        #print('Read data:', time.time() - start)
 
         torch.cuda.synchronize()
         start = time.time()
@@ -189,7 +189,7 @@ def train(opt):
             loss = crit(model_(fc_feats, att_feats, labels), labels[:,1:], masks[:,1:])
         else:
             gen_result, sample_logprobs = model.sample(fc_feats, att_feats, {'sample_max':0})
-            reward = get_self_critical_reward(model, fc_feats, att_feats, data, gen_result)
+            reward, tr_cider = get_self_critical_reward(model, fc_feats, att_feats, data, gen_result)
             loss = rl_crit(sample_logprobs, gen_result, Variable(torch.from_numpy(reward).float().cuda(), requires_grad=False))
 
         loss.backward()
@@ -198,12 +198,13 @@ def train(opt):
         train_loss = loss.data[0]
         torch.cuda.synchronize()
         end = time.time()
-        if not sc_flag:
-            print("iter {} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}" \
-                .format(iteration, epoch, train_loss, end - start))
-        else:
-            print("iter {} (epoch {}), avg_reward = {:.3f}, time/batch = {:.3f}" \
-                .format(iteration, epoch, np.mean(reward[:,0]), end - start))
+        if iteration % 25 == 0 :
+            if not sc_flag:
+                print("iter {} (epoch {}), train_loss = {:.3f}, time/batch = {:.3f}" \
+                    .format(iteration, epoch, train_loss, end - start))
+            else:
+                print("iter {} (epoch {}), avg_reward = {:.3f}, tr_cider = {:.3f}, time/batch = {:.3f}" \
+                    .format(iteration, epoch, np.mean(reward[:,0]), tr_cider, end - start))
 
         # Update the iteration and epoch
         iteration += 1

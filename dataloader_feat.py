@@ -260,12 +260,9 @@ class BlobFetcher():
         self.split = split
         self.dataloader = dataloader
         self.if_shuffle = if_shuffle
-        if batch_size :
-            self.reset(batch_size)
-        else :
-            self.reset(self.dataloader.batch_size)
+        self.reset()
     # Add more in the queue
-    def reset(self, batch_size):
+    def reset(self):
         """
         Two cases:
         1. not hasattr(self, 'split_loader'): Resume from previous training. Create the dataset given the saved split_ix and iterator
@@ -274,7 +271,7 @@ class BlobFetcher():
         # batch_size is 0, the merge is done in DataLoader class
         #print('cpu count: %d'%(multiprocessing.cpu_count()))
         self.split_loader = iter(data.DataLoader(dataset=self.dataloader,
-                                                 batch_size=batch_size,
+                                                 batch_size=self.dataloader.batch_size,
                                                  sampler=self.dataloader.split_ix[self.split][
                                                          self.dataloader.iterators[self.split]:],
                                                  shuffle=False,

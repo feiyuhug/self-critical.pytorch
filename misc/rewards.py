@@ -54,9 +54,10 @@ def get_self_critical_reward(model, fc_feats, att_feats, data, gen_result):
     gts = {i: gts[i % batch_size // seq_per_img] for i in range(2 * batch_size)}
     _, scores = CiderD_scorer.compute_score(gts, res)
     #print('Cider scores:', _)
-
+    base_score = np.mean(scores[batch_size:])
+    expore_score = np.mean(scores[:batch_size] )
     scores = scores[:batch_size] - scores[batch_size:]
 
     rewards = np.repeat(scores[:, np.newaxis], gen_result.shape[1], 1)
 
-    return rewards, _
+    return rewards, base_score, expore_score

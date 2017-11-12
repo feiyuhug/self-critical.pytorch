@@ -211,6 +211,7 @@ def train(opt):
         if data['bounds']['wrapped']:
             epoch += 1
             update_lr_flag = True
+            loader.reset_iterator('train')
 
         # Write the training loss summary
         if (iteration % opt.losses_log_every == 0):

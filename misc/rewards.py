@@ -61,3 +61,38 @@ def get_self_critical_reward(model, fc_feats, att_feats, data, gen_result):
     rewards = np.repeat(scores[:, np.newaxis], gen_result.shape[1], 1)
 
     return rewards, base_score, expore_score
+
+def get_self_critical_reward_t(model, fc_feats, att_feats, topics, data, gen_result):
+    batch_size = gen_result.size(0)# batch_size = sample_size * seq_per_img
+    seq_per_img = batch_size // len(data['gts'])
+
+    # get greedy decoding baseline
+    greedy_res, _ = model.sample(Variable(fc_feats.data, volatile=True), Variable(att_feats.data, volatile=True), Variable(topics.data, volatile=True))
+
+    res = OrderedDict()
+
+    gen_result = gen_result.cpu().numpy()
+    greedy_res = greedy_res.cpu().numpy()
+    for i in range(batch_size):
+        res[i] = [array_to_str(gen_result[i])]
+    for i in range(batch_size):
+        res[batch_size + i] = [array_to_str(greedy_res[i])]
+
+    gts = OrderedDict()
+    for i in range(len(data['gts'])):
+        gts[i] = [array_to_str(data['gts'][i][j]) for j in range(len(data['gts'][i]))]
+
+    #_, scores = Bleu(4).compute_score(gts, res)
+    #scores = np.array(scores[3])
+    res = [{'image_id':i, 'caption': res[i]} for i in range(2 * batch_size)]
+    gts = {i: gts[i % batch_size // seq_per_img] for i in range(2 * batch_size)}
+    _, scores = CiderD_scorer.compute_score(gts, res)
+    #print('Cider scores:', _)
+    base_score = np.mean(scores[batch_size:])
+    expore_score = np.mean(scores[:batch_size] )
+    scores = scores[:batch_size] - scores[batch_size:]
+
+    rewards = np.repeat(scores[:, np.newaxis], gen_result.shape[1], 1)
+
+    return rewards, base_score, expore_score
+

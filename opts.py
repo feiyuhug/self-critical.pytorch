@@ -54,6 +54,7 @@ def parse_opt():
                     help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=16,
                     help='minibatch size')
+    parser.add_argument('--iter_times', type=int, default=1)
     parser.add_argument('--gpu_num', type=int, default=1)
     parser.add_argument('--fix_rnn', type=int, default=0)
     parser.add_argument('--grad_clip', type=float, default=0.1, #5.,
@@ -66,6 +67,7 @@ def parse_opt():
                     help='number of captions to sample for each image during training. Done for efficiency since CNN forward pass is expensive. E.g. coco has 5 sents/image')
     parser.add_argument('--beam_size', type=int, default=1,
                     help='used when sample_max = 1, indicates number of beams in beam search. Usually 2 or 3 works well. More is not better. Set this to 1 for faster runtime but a bit worse performance.')
+    parser.add_argument('--sample_weights', type=str)
 
     #Optimization: for the Language Model
     parser.add_argument('--optim', type=str, default='adam',

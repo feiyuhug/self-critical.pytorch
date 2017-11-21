@@ -14,6 +14,7 @@ from .FCModel import FCModel
 from .OldModel import ShowAttendTellModel, AllImgModel
 from .Att2inModel import Att2inModel
 from .AttModel import *
+from .AttModel_t import *
 
 def setup(opt):
 
@@ -34,6 +35,8 @@ def setup(opt):
     # Top-down attention model
     elif opt.caption_model == 'topdown':
         model = TopDownModel(opt)
+    elif opt.caption_model == 'topdown_t':
+        model = TopDownModel_t(opt)
     else:
         raise Exception("Caption model not supported: {}".format(opt.caption_model))
 

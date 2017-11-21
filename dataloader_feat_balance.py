@@ -10,6 +10,7 @@ import random
 
 import torch
 import torch.utils.data as data
+import torch.utils.data.sampler as sampler
 
 from scipy.misc import imread, imresize
 import multiprocessing
@@ -95,7 +96,9 @@ class DataLoader(data.Dataset):
         self.label_start_ix = self.h5_label_file['label_start_ix'][:]
         self.label_end_ix = self.h5_label_file['label_end_ix'][:]
 
-
+        # load in the sample weights file
+        self.sample_weights = np.load(self.opt.sample_weights)
+        print('sample weights %s loaded...'%(opt.sample_weights))
         # extract image size from dataset
         '''
         if self.use_img != 0 :
@@ -257,7 +260,6 @@ class DataLoader(data.Dataset):
     def __len__(self):
         return len(self.info['images'])
 
-
 class BlobFetcher():
     """Experimental class for prefetching blobs in a separate process."""
 
@@ -268,6 +270,7 @@ class BlobFetcher():
         self.split = split
         self.dataloader = dataloader
         self.if_shuffle = if_shuffle
+        self.split_ix = None
         self.reset()
     # Add more in the queue
     def reset(self):
@@ -278,9 +281,17 @@ class BlobFetcher():
         """
         # batch_size is 0, the merge is done in DataLoader class
         #print('cpu count: %d'%(multiprocessing.cpu_count()))
+        if self.split == 'train' :
+            split_sample_weights = self.dataloader.sample_weights[np.array(self.dataloader.split_ix[self.split])]
+            mysample_ = sampler.WeightedRandomSampler(split_sample_weights, len(self.dataloader.split_ix[self.split]))
+            mysample = np.array(self.dataloader.split_ix[self.split])[np.array(list(mysample_))]
+            self.split_ix = mysample.tolist()
+        else :
+            self.split_ix = self.dataloader.split_ix[self.split]
+        #np.save('data/tmp/%s_ix.npy'%(self.split), np.array(self.split_ix))
         self.split_loader = iter(data.DataLoader(dataset=self.dataloader,
                                                  batch_size=self.dataloader.batch_size,
-                                                 sampler=self.dataloader.split_ix[self.split][
+                                                 sampler=self.split_ix[
                                                          self.dataloader.iterators[self.split]:],
                                                  shuffle=False,
                                                  pin_memory=False,
@@ -290,15 +301,14 @@ class BlobFetcher():
     def _get_next_minibatch_inds(self):
         if not hasattr(self, 'split_loader'):
             self.reset()
-        max_index = len(self.dataloader.split_ix[self.split]) \
-            - len(self.dataloader.split_ix[self.split]) % self.dataloader.batch_size
+        max_index = len(self.split_ix) - len(self.split_ix) % self.dataloader.batch_size
         wrapped = False
 
         ri = self.dataloader.iterators[self.split]
-        ix = self.dataloader.split_ix[self.split][ri]
+        ix = self.split_ix[ri]
 
         ri_next = ri + 1
-        if ri_next >= max_index :
+        if ri_next >= max_index:
             ri_next = 0
             if self.if_shuffle:
                 random.shuffle(self.dataloader.split_ix[self.split])

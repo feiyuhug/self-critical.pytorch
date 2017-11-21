@@ -18,7 +18,7 @@ sys.setdefaultencoding('UTF8')
 
 import opts
 import models
-from dataloader_feat import *
+from dataloader_feat_balance import *
 import eval_utils_t
 import misc.utils as utils
 from misc.rewards import init_cider_scorer, get_self_critical_reward, get_self_critical_reward_t

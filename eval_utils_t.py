@@ -136,9 +136,14 @@ def eval_split(cnn_model, model, crit, loader, eval_kwargs={}):
 
         # forward the model to get loss
         if data.get('labels', None) is not None:
-            loss = crit(model(fc_feats, att_feats, labels), labels[:,1:], masks[:,1:]).data[0]
-            loss_sum = loss_sum + loss
-            loss_evals = loss_evals + 1
+            if use_topic:
+                loss = crit(model(fc_feats, att_feats, topics, labels), labels[:,1:], masks[:,1:]).data[0]
+                loss_sum = loss_sum + loss
+                loss_evals = loss_evals + 1
+            else:
+                loss = crit(model(fc_feats, att_feats, labels), labels[:,1:], masks[:,1:]).data[0]
+                loss_sum = loss_sum + loss
+                loss_evals = loss_evals + 1
 
         # forward the model to also get generated samples for each image
         # Only leave one feature for each image, in case duplicate sample
@@ -151,7 +156,10 @@ def eval_split(cnn_model, model, crit, loader, eval_kwargs={}):
             topics = topics.data.cpu().numpy()[np.arange(loader.batch_size) * loader.seq_per_img]
             topics = Variable(torch.from_numpy(topics), volatile=True).cuda()
         # forward the model to also get generated samples for each image
-        seq, _ = model.sample(fc_feats, att_feats, eval_kwargs)
+        if use_topic:
+            seq, _ = model.sample(fc_feats, att_feats, topics, eval_kwargs)
+        else:
+            seq, _ = model.sample(fc_feats, att_feats, eval_kwargs)
 
         #set_trace()
         sents = utils.decode_sequence(loader.get_vocab(), seq)

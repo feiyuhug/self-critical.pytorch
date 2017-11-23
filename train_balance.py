@@ -180,7 +180,7 @@ def train(opt):
         start = time.time()
         # Load data from train split (0)
         data = loader.get_batch('train')
-        #print('Read data:', time.time() - start)
+        print('Read data:', time.time() - start)
 
         torch.cuda.synchronize()
         start = time.time()

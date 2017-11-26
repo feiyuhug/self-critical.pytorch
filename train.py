@@ -66,6 +66,7 @@ def train(opt):
 
     loader.iterators = infos.get('iterators', loader.iterators)
     loader.split_ix = infos.get('split_ix', loader.split_ix)
+    loader.syn_iterator_all()
     if opt.load_best_score == 1:
         best_val_score = infos.get('best_val_score', None)
 
